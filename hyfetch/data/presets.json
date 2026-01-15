@@ -9,7 +9,7 @@
   "agender": ["#000000", "#BABABA", "#FFFFFF", "#BAF484", "#FFFFFF", "#BABABA", "#000000"],
   "queer": ["#B57FDD", "#FFFFFF", "#49821E"],
   "genderfluid": ["#FE76A2", "#FFFFFF", "#BF12D7", "#000000", "#303CBE"],
-  "bisexual": ["#D60270", "#9B4F96", "#0038A8"],
+  "bisexual": ["#D60270", "#D60270", "#9B4F96", "#0038A8", "#0038A8"],
   "pansexual": ["#FF1C8D", "#FFD700", "#1AB3FF"],
   "polysexual": ["#F714BA", "#01D66A", "#1594F6"],
   "omnisexual": {
