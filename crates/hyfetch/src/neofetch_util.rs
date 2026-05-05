@@ -3,8 +3,6 @@ use std::ffi::OsStr;
 #[cfg(feature = "macchina")]
 use std::fs;
 use std::io::{Write as _};
-#[cfg(windows)]
-use std::io::{self};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -155,7 +153,13 @@ pub fn add_pkg_path() -> Result<()> {
     // Get PATH
     let pv = &env::var_os("PATH").context("`PATH` env var is not set or invalid")?;
     let mut path = env::split_paths(pv).collect::<Vec<_>>();
-    let exe = env::current_exe().context("failed to get path of current running executable")?;
+    let exe = match env::current_exe() {
+        Ok(exe) => exe,
+        Err(e) => {
+            debug!("Failed to get path of current running executable: {}", e);
+            return Ok(());
+        }
+    };
     let base = exe.parent().unwrap();
 
     // Add from bin: ../git, ../fastfetch, ../scripts
@@ -235,27 +239,27 @@ pub fn get_distro_ascii<S>(distro: Option<S>, backend: Backend) -> Result<RawAsc
 where
     S: AsRef<str> + fmt::Debug,
 {
-    let distro: Cow<_> = if let Some(distro) = distro.as_ref() {
+    let distro_name: Cow<_> = if let Some(distro) = distro.as_ref() {
         distro.as_ref().into()
     } else {
         get_distro_name(backend)
             .context("failed to get distro name")?
             .into()
     };
-    debug!(%distro, "distro name");
+    debug!(%distro_name, "distro name");
 
     // Try new codegen-based detection method
-    if let Some(distro) = Distro::detect(&distro) {
+    if let Some(distro) = Distro::detect(&distro_name) {
         let asc = distro.ascii_art().to_owned();
         let fg = ascii_foreground(&distro);
 
         return Ok(RawAsciiArt { asc, fg });
     }
 
-    debug!(%distro, "could not find a match for distro; falling back to neofetch");
+    debug!(%distro_name, "could not find a match for distro; falling back to neofetch");
 
     // Old detection method that calls neofetch
-    let asc = run_neofetch_command_piped(&["print_ascii", "--ascii_distro", distro.as_ref()])
+    let asc = run_neofetch_command_piped(&["print_ascii", "--ascii_distro", distro_name.as_ref()])
         .context("failed to get ascii art from neofetch")?;
 
     // Unescape backslashes here because backslashes are escaped in neofetch for
@@ -316,31 +320,53 @@ where
 /// Gets the absolute path of the bash command.
 #[cfg(windows)]
 fn bash_path() -> Result<PathBuf> {
-    // Find `bash.exe` in `PATH`, but exclude the known bad paths
-    if let Some(bash_path) = find_in_path("bash.exe").context("bash.exe not found")? {
-        // Check if it's not MSYS bash https://stackoverflow.com/a/58418686/1529493
-        if !bash_path.ends_with(r"Git\usr\bin\bash.exe") {
-            // Check if it's not WSL bash
-            // See https://github.com/hykilpikonna/hyfetch/issues/233
-            let windir = env::var_os("windir").context("`windir` environ not found")?;
-            match is_same_file(&bash_path, Path::new(&windir).join(r"System32\bash.exe")) {
-                Ok(false) => return Ok(bash_path),
-                Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(bash_path),
-                _ => {}
+    // 1. Try to find a good bash.exe in PATH
+    let bash_in_path = find_in_path("bash.exe").unwrap_or(None);
+    if let Some(pth) = &bash_in_path {
+        // Check if it's not WSL bash
+        // See https://github.com/hykilpikonna/hyfetch/issues/233
+        let is_wsl = (|| {
+            let windir = env::var_os("windir")?;
+            let wsl_bash = Path::new(&windir).join(r"System32\bash.exe");
+            Some(is_same_file(pth, &wsl_bash).unwrap_or(false))
+        })()
+        .unwrap_or(false);
+
+        if !is_wsl {
+            // Check if it's not MSYS bash https://stackoverflow.com/a/58418686/1529493
+            // We prefer the Git wrapper bash if possible, but we'll accept this if it's all we have.
+            if !pth.ends_with(r"Git\usr\bin\bash.exe") {
+                return Ok(pth.clone());
             }
         }
     }
 
-    if let Some(bash_path) = find_in_path("git.exe").context("failed to find `git.exe` in `PATH`")? {
-        if bash_path.ends_with(r"Git\cmd\git.exe") {
-            let pth = bash_path.parent().unwrap().parent().unwrap().join(r"bin\bash.exe");
-            if pth.is_file() {
-                return Ok(pth);
+    // 2. Try to find git.exe in PATH and look for bash.exe relative to it
+    if let Ok(Some(git_path)) = find_in_path("git.exe") {
+        let mut current = git_path.clone();
+        for _ in 0..3 {
+            if let Some(parent) = current.parent() {
+                let bin_bash = parent.join(r"bin\bash.exe");
+                if bin_bash.is_file() {
+                    return Ok(bin_bash);
+                }
+                let usr_bin_bash = parent.join(r"usr\bin\bash.exe");
+                if usr_bin_bash.is_file() {
+                    return Ok(usr_bin_bash);
+                }
+                current = parent.to_path_buf();
+            } else {
+                break;
             }
         }
     }
 
-    Err(anyhow!("bash.exe not found"))
+    // 3. Fallback to whatever bash we found in PATH (even if it was the MSYS one)
+    if let Some(pth) = bash_in_path {
+        return Ok(pth);
+    }
+
+    Err(anyhow!("bash.exe not found. Please ensure Git for Windows is installed and in your PATH."))
 }
 
 /// Runs neofetch command, returning the piped stdout output.
@@ -383,8 +409,14 @@ where
     {
         let bash_path = bash_path().context("failed to get bash path")?;
         let mut command = Command::new(bash_path);
-        command.arg(neofetch_path);
-        command.args(args);
+
+        // Convert path to use forward slashes because bash will interpret backslashes as escapes
+        command.arg(neofetch_path.to_string_lossy().replace('\\', "/"));
+
+        for arg in args {
+            // Also convert any backslashes in arguments to forward slashes for bash
+            command.arg(arg.as_ref().to_string_lossy().replace('\\', "/"));
+        }
         Ok(command)
     }
 }
@@ -503,7 +535,7 @@ pub fn get_distro_name(backend: Backend) -> Result<String> {
                     doc["spacing"] = value(0);
                     doc["padding"] = value(0);
                     // See https://github.com/Macchina-CLI/macchina/issues/319
-                    // doc["hide_ascii"] = value(true);
+                    doc["hide_ascii"] = value(false);
                     doc["separator"] = value("");
                     doc["custom_ascii"] = Item::Table(Table::from_iter([(
                         "path",
@@ -534,8 +566,11 @@ pub fn get_distro_name(backend: Backend) -> Result<String> {
             ];
             run_macchina_command_piped(&args[..])
                 .map(|s| {
-                    anstream::adapter::strip_str(&s)
-                        .to_string()
+                    let s = anstream::adapter::strip_str(&s).to_string();
+                    let s = s.trim();
+                    s.splitn(2, '-')
+                        .last()
+                        .expect("splitn with 2 should always have at least 1 element")
                         .trim()
                         .to_owned()
                 })
@@ -655,6 +690,7 @@ fn run_macchina(asc: String, args: Option<&Vec<String>>) -> Result<()> {
             .context("failed to create temp file for macchina theme")?;
         let theme_doc = {
             let mut doc = DocumentMut::new();
+            doc["hide_ascii"] = value(false);
             doc["custom_ascii"] = Item::Table(Table::from_iter([(
                 "path",
                 &*asc_file_path.to_string_lossy(),
@@ -696,65 +732,8 @@ fn run_macchina(asc: String, args: Option<&Vec<String>>) -> Result<()> {
 /// Gets the color indices that should be considered as foreground, for a
 /// particular distro's ascii art.
 fn ascii_foreground(distro: &Distro) -> Vec<NeofetchAsciiIndexedColor> {
-    let fg: Vec<u8> = match distro {
-        Distro::Anarchy => vec![2],
-        Distro::Android => vec![2],
-        Distro::Antergos => vec![1],
-        Distro::ArchStrike => vec![2],
-        Distro::Arkane => vec![1],
-        Distro::Asahi => vec![5],
-        Distro::Astra_Linux => vec![2],
-        Distro::BlackArch => vec![3],
-        Distro::CelOS => vec![3],
-        Distro::Chapeau => vec![2],
-        Distro::Chrom => vec![5],
-        Distro::Clear_Linux_OS => vec![2],
-        Distro::Container_Linux_by_CoreOS => vec![3],
-        Distro::CRUX => vec![3],
-        Distro::EuroLinux => vec![2],
-        Distro::eweOS => vec![3],
-        Distro::Fedora => vec![2],
-        Distro::Fedora_Sericea => vec![2],
-        Distro::Fedora_Silverblue => vec![2],
-        Distro::GalliumOS => vec![2],
-        Distro::Gentoo => vec![1],
-        Distro::HarDClanZ => vec![2],
-        Distro::Kibojoe => vec![3],
-        Distro::KrassOS => vec![2],
-        Distro::Kubuntu => vec![2],
-        Distro::Linux => vec![1],
-        Distro::LinuxFromScratch => vec![1, 3],
-        Distro::Lubuntu => vec![2],
-        Distro::openEuler => vec![2],
-        Distro::orchid => vec![1],
-        Distro::Panwah => vec![1],
-        Distro::Peppermint => vec![2],
-        Distro::PNM_Linux => vec![2],
-        Distro::Pop__OS => vec![2],
-        Distro::Reborn_OS => vec![1],
-        Distro::SalentOS => vec![4],
-        Distro::Septor => vec![2],
-        Distro::Ubuntu_Cinnamon => vec![2],
-        Distro::Ubuntu_Kylin => vec![2],
-        Distro::Ubuntu_MATE => vec![2],
-        Distro::Ubuntu_old => vec![2],
-        Distro::Ubuntu_Studio => vec![2],
-        Distro::Ubuntu_Sway => vec![2],
-        Distro::Ultramarine_Linux => vec![2],
-        Distro::Univention => vec![2],
-        Distro::uwuntu => vec![2],
-        Distro::Vanilla => vec![2],
-        Distro::VNux => vec![3, 5],
-        Distro::Void => vec![2],
-        Distro::Xray_OS => vec![2, 3],
-        Distro::Xubuntu => vec![2],
-        _ => Vec::new(),
-    };
-
-    fg.into_iter()
-        .map(|fore| {
-            fore.try_into()
-                .expect("`fore` should be a valid neofetch color index")
-        })
+    distro.foreground()
+        .iter()
+        .map(|&f| f.try_into().expect("neofetch color index should be valid"))
         .collect()
 }

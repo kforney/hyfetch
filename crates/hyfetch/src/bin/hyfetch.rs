@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 use std::cmp;
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs::{self, File};
-use std::io::{self, IsTerminal as _, Read as _};
+use std::io::{self, IsTerminal as _, Read as _, Write};
 use std::iter;
 use std::iter::zip;
 use std::num::NonZeroU8;
@@ -10,6 +11,8 @@ use std::path::{Path, PathBuf};
 
 use aho_corasick::AhoCorasick;
 use anyhow::{Context as _, Result};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use deranged::RangedU8;
 use enterpolation::bspline::BSpline;
 use enterpolation::{Curve as _, Generator as _};
@@ -21,7 +24,7 @@ use hyfetch::color_util::{
     NeofetchAsciiIndexedColor, PresetIndexedColor, Theme as _, ToAnsiString as _,
 };
 use hyfetch::distros::Distro;
-use hyfetch::models::Config;
+use hyfetch::models::{build_hex_color_profile, Config, PresetValue};
 #[cfg(feature = "macchina")]
 use hyfetch::neofetch_util::macchina_path;
 use hyfetch::neofetch_util::{self, add_pkg_path, fastfetch_path, get_distro_ascii, get_distro_name, literal_input, ColorAlignment, NEOFETCH_COLORS_AC, NEOFETCH_COLOR_PATTERNS, TEST_ASCII};
@@ -44,13 +47,23 @@ use tracing::debug;
 
 fn main() -> Result<()> {
     add_pkg_path().expect("failed to add pkg path");
-    
+
     #[cfg(windows)]
     if let Err(err) = enable_ansi_support::enable_ansi_support() {
         debug!(%err, "could not enable ANSI escape code support");
     }
 
     let options = options().run();
+
+    // Read ascii file first to avoid any issues with file descriptors being closed by other operations, and to allow CLI arguments to override config. (https://github.com/hykilpikonna/hyfetch/issues/475)
+    let cli_ascii = if let Some(path) = &options.ascii_file {
+        Some(RawAsciiArt {
+            asc: fs::read_to_string(path).with_context(|| format!("failed to read ascii from {path:?}"))?,
+            fg: Vec::new(),
+        })
+    } else {
+        None
+    };
 
     let debug_mode = options.debug;
 
@@ -123,43 +136,61 @@ fn main() -> Result<()> {
     let backend = options.backend.unwrap_or(config.backend);
     let args = options.args.as_ref().or(config.args.as_ref());
 
-    fn parse_preset_string(preset_string: &str) -> Result<ColorProfile> {
+    fn parse_preset_string(preset_string: &str, config: &Config) -> Result<ColorProfile> {
         if preset_string.contains('#') {
-            let colors: Vec<&str> = preset_string.split(',').map(|s| s.trim()).collect();
-            for color in &colors {
-                if !color.starts_with('#') ||
-                    (color.len() != 4 && color.len() != 7) ||
-                    !color[1..].chars().all(|c| c.is_ascii_hexdigit()) {
-                    return Err(anyhow::anyhow!("invalid hex color: {}", color));
-                }
-            }
-            ColorProfile::from_hex_colors(colors)
-                .context("failed to create color profile from hex")
-        } else if preset_string == "random" {
+            let colors: Vec<String> = preset_string
+                .split(',')
+                .map(|s| s.trim().to_owned())
+                .collect();
+            let color_profile = build_hex_color_profile(&colors)
+                .context("failed to create color profile from hex")?;
+            return Ok(color_profile);
+        }
+
+        let mut preset_profiles: HashMap<String, ColorProfile> = <Preset as VariantArray>::VARIANTS
+            .iter()
+            .map(|preset| (preset.as_ref().to_owned(), preset.color_profile()))
+            .collect();
+        preset_profiles.extend(config.custom_preset_profiles()?);
+
+        if preset_string.contains(',') {
+            let presets: Vec<&str> = preset_string.split(',').map(|s| s.trim()).collect();
             let mut rng = fastrand::Rng::new();
-            let preset = *rng
-                .choice(<Preset as VariantArray>::VARIANTS)
-                .expect("preset iterator should not be empty");
-            Ok(preset.color_profile())
+            let selected_index = rng.usize(0..presets.len());
+            return parse_preset_string(presets[selected_index], config);
+        }
+
+        if preset_string == "random" {
+            let presets: Vec<ColorProfile> = preset_profiles.values().cloned().collect();
+            if presets.is_empty() {
+                return Err(anyhow::anyhow!("preset iterator should not be empty"));
+            }
+            let mut rng = fastrand::Rng::new();
+            let selected_index = rng.usize(0..presets.len());
+            return Ok(presets[selected_index].clone());
+        }
+
+        if let Some(color_profile) = preset_profiles.get(preset_string) {
+            Ok(color_profile.clone())
         } else {
-            use std::str::FromStr;
-            let preset = Preset::from_str(preset_string)
-                .with_context(|| {
-                    format!(
-                        "PRESET should be comma-separated hex colors or one of {{{presets}}}",
-                        presets = <Preset as VariantNames>::VARIANTS
-                            .iter()
-                            .chain(iter::once(&"random"))
-                            .join(",")
-                    )
-                })?;
-            Ok(preset.color_profile())
+            let presets = preset_profiles
+                .keys()
+                .map(String::as_str)
+                .chain(iter::once("random"))
+                .sorted()
+                .join(",");
+            Err(anyhow::anyhow!(
+                "PRESET should be comma-separated hex colors or one of {{{presets}}}"
+            ))
         }
     }
 
     // Get preset
-    let preset_string = options.preset.as_deref().unwrap_or(&config.preset);
-    let color_profile = parse_preset_string(preset_string)?;
+    let preset_string = options
+        .preset
+        .clone()
+        .unwrap_or_else(|| config.preset.get_random_if_multiple());
+    let color_profile = parse_preset_string(&preset_string, &config)?;
     debug!(?color_profile, "color profile");
 
     // Lighten
@@ -177,14 +208,10 @@ fn main() -> Result<()> {
     };
     debug!(?color_profile, "lightened color profile");
 
-    let asc = if let Some(path_str) = config.custom_ascii_path {
+    let asc = if let Some(asc) = cli_ascii {
+        asc
+    } else if let Some(path_str) = config.custom_ascii_path {
         let path = PathBuf::from(path_str);
-        RawAsciiArt {
-            asc: fs::read_to_string(&path)
-                .with_context(|| format!("failed to read ascii from {path:?}"))?,
-            fg: Vec::new(),
-        }
-    } else if let Some(path) = options.ascii_file {
         RawAsciiArt {
             asc: fs::read_to_string(&path)
                 .with_context(|| format!("failed to read ascii from {path:?}"))?,
@@ -241,15 +268,15 @@ fn det_bg() -> Result<Option<Srgb<u8>>, terminal_colorsaurus::Error> {
         return Ok(None);
     }
 
-    background_color(QueryOptions::default())
-        .map(|terminal_colorsaurus::Color { r, g, b , .. }| Some(Srgb::new(r, g, b).into_format()))
-        .or_else(|err| {
-            if matches!(err, terminal_colorsaurus::Error::UnsupportedTerminal(_)) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
-        })
+    match background_color(QueryOptions::default()) {
+        Ok(terminal_colorsaurus::Color { r, g, b, .. }) => {
+            Ok(Some(Srgb::new(r, g, b).into_format()))
+        }
+        Err(err) => {
+            debug!(?err, "failed to detect background color");
+            Ok(None)
+        }
+    }
 }
 
 /// Creates config interactively.
@@ -447,6 +474,40 @@ fn create_config(
     //////////////////////////////
     // 3. Choose preset
 
+    struct RawModeGuard {
+        enabled: bool,
+    }
+
+    impl RawModeGuard {
+        fn new() -> Result<Self> {
+            Ok(Self { enabled: false })
+        }
+
+        fn enable(&mut self) -> Result<()> {
+            if !self.enabled {
+                enable_raw_mode().context("failed to enable terminal raw mode")?;
+                self.enabled = true;
+            }
+            Ok(())
+        }
+
+        fn disable(&mut self) -> Result<()> {
+            if self.enabled {
+                disable_raw_mode().context("failed to disable terminal raw mode")?;
+                self.enabled = false;
+            }
+            Ok(())
+        }
+    }
+
+    impl Drop for RawModeGuard {
+        fn drop(&mut self) {
+            if self.enabled {
+                let _ = disable_raw_mode();
+            }
+        }
+    }
+
     // Create flag lines
     let mut flags = Vec::with_capacity(Preset::COUNT);
     let spacing = {
@@ -473,7 +534,11 @@ fn create_config(
             name = preset.as_ref(),
             spacing = usize::from(spacing)
         );
-        flags.push([name, flag.clone(), flag.clone(), flag]);
+        flags.push((
+            preset.clone(),
+            [name, flag.clone(), flag.clone(), flag],
+            preset.as_ref().to_ascii_lowercase(),
+        ));
     }
 
     // Calculate flags per row
@@ -483,34 +548,28 @@ fn create_config(
         let rows_per_page = (term_h.saturating_sub(13) / 5).clamp(1, u8::MAX.into()) as u8;
         (flags_per_row, rows_per_page)
     };
-    let num_pages = (Preset::COUNT.div_ceil(flags_per_row as usize * rows_per_page as usize)).clamp(0, u8::MAX.into()) as u8;
+    let flags_per_page = usize::from(flags_per_row) * usize::from(rows_per_page);
 
-    // Create pages
-    let mut pages = Vec::with_capacity(usize::from(num_pages));
-    for flags in flags.chunks(usize::from(
-        u16::from(flags_per_row)
-            .checked_mul(u16::from(rows_per_page))
-            .unwrap(),
-    )) {
-        let mut page = Vec::with_capacity(usize::from(rows_per_page));
-        for flags in flags.chunks(usize::from(flags_per_row)) {
-            page.push(flags);
+    fn filter_flag_indices(query: &str, flags: &[(Preset, [String; 4], String)]) -> Vec<usize> {
+        if query.is_empty() {
+            return (0..flags.len()).collect();
         }
-        pages.push(page);
+
+        let mut matched = flags
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, (_, _, preset_name))| {
+                let position = preset_name.find(query)?;
+                Some((idx, preset_name.starts_with(query), position))
+            })
+            .collect::<Vec<_>>();
+
+        // Prefix matches are shown first, then other substring matches ordered by earliest index.
+        matched.sort_by_key(|&(idx, is_prefix, position)| (!is_prefix, position, idx));
+        matched.into_iter().map(|(idx, _, _)| idx).collect()
     }
 
-    let print_flag_page = |page, page_num: u8| -> Result<()> {
-        clear_screen(Some(&title), color_mode, debug_mode).context("failed to clear screen")?;
-        print_title_prompt(option_counter, "Let's choose a flag!");
-        println!("Available flag presets:\nPage: {page_num} of {num_pages}\n", page_num = page_num + 1);
-        for &row in page {
-            print_flag_row(row, color_mode).context("failed to print flag row")?;
-        }
-        println!();
-        Ok(())
-    };
-
-    fn print_flag_row(row: &[[String; 4]], color_mode: AnsiMode) -> Result<()> {
+    fn print_flag_row(row: &[&[String; 4]], color_mode: AnsiMode) -> Result<()> {
         for i in 0..4 {
             let mut line = Vec::new();
             for flag in row {
@@ -533,50 +592,214 @@ fn create_config(
         )
         .expect("coloring text with default preset should not fail");
 
-    let preset: Preset;
-    let color_profile;
+    let print_flag_page = |filtered_indices: &[usize],
+                           page_num: usize,
+                           filter: &str,
+                           hint: Option<&str>|
+     -> Result<()> {
+        let num_pages = filtered_indices.len().div_ceil(flags_per_page).max(1);
+        clear_screen(Some(&title), color_mode, debug_mode).context("failed to clear screen")?;
+        print_title_prompt(option_counter, "Let's choose a flag!");
+        println!(
+            "Available flag presets:\nPage: {page} of {num_pages}\n",
+            page = page_num + 1
+        );
 
-    let mut page: u8 = 0;
-    loop {
-        print_flag_page(&pages[usize::from(page)], page).context("failed to print flag page")?;
+        let start = page_num * flags_per_page;
+        let end = (start + flags_per_page).min(filtered_indices.len());
+        let mut visible_rows: usize = 0;
+        if start >= end {
+            println!("No presets matched this filter.");
+        } else {
+            for row in filtered_indices[start..end].chunks(usize::from(flags_per_row)) {
+                let row = row
+                    .iter()
+                    .map(|&idx| &flags[idx].1)
+                    .collect::<Vec<&[String; 4]>>();
+                print_flag_row(&row, color_mode).context("failed to print flag row")?;
+                visible_rows += 1;
+            }
+            println!();
+        }
+        // Keep the prompt anchored by reserving a full page worth of flag rows.
+        for _ in visible_rows..usize::from(rows_per_page) {
+            for _ in 0..5 {
+                println!();
+            }
+        }
 
-        let mut opts: Vec<&str> = <Preset as VariantNames>::VARIANTS.into();
-        opts.extend(["next", "n", "prev", "p"]);
-
-        println!("Enter '[n]ext' to go to the next page and '[p]rev' to go to the previous page.");
-        let selection = literal_input(
-            format!("Which {preset_default_colored} do you want to use? "),
-            &opts[..],
-            Preset::Rainbow.as_ref(),
-            false,
+        println!(
+            "Use the up/down arrow keys to go to the previous/next page. Type to filter and press Enter to select."
+        );
+        printc(
+            format!(
+                "Which {preset_default_colored} do you want to use? (default: {}, comma-separated for multiple at random)",
+                Preset::Rainbow.as_ref()
+            ),
             color_mode,
         )
-        .context("failed to ask for choice input")
-        .context("failed to select preset")?;
-        if selection == "next" || selection == "n" {
-            page = (page + 1) % num_pages;
-        } else if selection == "prev" || selection == "p" {
-            page = (page + num_pages - 1) % num_pages;
-        } else {
-            preset = selection.parse().expect("selected preset should be valid");
-            debug!(?preset, "selected preset");
-            color_profile = preset.color_profile();
-            update_title(
-                &mut title,
-                &mut option_counter,
-                "Selected flag",
-                &color_profile
-                    .with_lightness_adaptive(default_lightness, theme)
-                    .color_text(
-                        preset.as_ref(),
-                        color_mode,
-                        ForegroundBackground::Foreground,
-                        false,
-                    )
-                    .expect("coloring text with selected preset should not fail"),
-            );
-            break;
+        .context("failed to print preset prompt")?;
+        print!("> {filter}");
+        io::stdout().flush().context("failed to flush preset prompt")?;
+
+        if let Some(hint) = hint {
+            println!("\n{hint}");
         }
+        Ok(())
+    };
+
+    let selected_preset_names: Vec<String>;
+    let color_profile;
+
+    let mut page: usize = 0;
+    let mut filter = String::new();
+    let mut hint: Option<&str> = None;
+    let mut raw_mode = RawModeGuard::new().context("failed to initialize raw input mode")?;
+    loop {
+        raw_mode
+            .disable()
+            .context("failed to disable raw mode for rendering")?;
+        let filter_lower = filter.to_ascii_lowercase();
+        let parts: Vec<&str> = filter_lower.split(',').collect();
+        let current_query = parts.last().cloned().unwrap_or("");
+        let filtered_indices = filter_flag_indices(current_query, &flags);
+        let num_pages = filtered_indices.len().div_ceil(flags_per_page).max(1);
+        page = page.min(num_pages - 1);
+
+        print_flag_page(&filtered_indices, page, &filter, hint)
+            .context("failed to print flag page")?;
+        hint = None;
+
+        raw_mode
+            .enable()
+            .context("failed to enable raw mode for key input")?;
+        let event = event::read().context("failed to read keyboard event")?;
+        let Event::Key(key) = event else {
+            continue;
+        };
+        if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+            continue;
+        }
+
+        match key.code {
+            KeyCode::Enter => {
+                let filter_lower = filter.to_ascii_lowercase();
+                let parts: Vec<&str> = filter_lower.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                let mut resolved_presets = Vec::new();
+
+                if parts.is_empty() {
+                    // Default to Rainbow if nothing is entered
+                    resolved_presets.push(Preset::Rainbow.as_ref().to_owned());
+                } else {
+                    for part in parts.iter() {
+                        let selection = flags
+                            .iter()
+                            .find(|(_, _, name)| name == part)
+                            .map(|(preset, _, _)| preset.as_ref().to_owned())
+                            .or_else(|| {
+                                // Fuzzy match each part
+                                let filtered = filter_flag_indices(part, &flags);
+                                filtered.first().map(|&idx| flags[idx].0.as_ref().to_owned())
+                            });
+                        
+                        if let Some(p) = selection {
+                            resolved_presets.push(p);
+                        } else {
+                            hint = Some("One or more presets could not be found.");
+                        }
+                    }
+                }
+
+                if hint.is_none() {
+                    selected_preset_names = resolved_presets;
+                    break;
+                }
+            },
+            KeyCode::Up => {
+                page = (page + num_pages - 1) % num_pages;
+            },
+            KeyCode::Down => {
+                page = (page + 1) % num_pages;
+            },
+            KeyCode::Backspace => {
+                filter.pop();
+                page = 0;
+            },
+            KeyCode::Esc => {
+                filter.clear();
+                page = 0;
+            },
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                raw_mode
+                    .disable()
+                    .context("failed to disable raw mode before interrupting")?;
+                println!();
+                return Err(anyhow::anyhow!("interrupted by user"));
+            },
+            KeyCode::Char(c)
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                filter.push(c);
+                page = 0;
+            },
+            _ => {},
+        }
+    }
+    raw_mode
+        .disable()
+        .context("failed to disable raw mode after preset selection")?;
+
+    let selected_presets = if selected_preset_names.len() > 1 {
+        PresetValue::Multiple(selected_preset_names.clone())
+    } else {
+        PresetValue::Single(selected_preset_names.first().cloned().unwrap_or_else(|| Preset::Rainbow.as_ref().to_owned()))
+    };
+
+    color_profile = {
+        let first_name = selected_preset_names.first().cloned().unwrap_or_else(|| Preset::Rainbow.as_ref().to_owned());
+        if first_name.contains('#') {
+            let colors: Vec<String> = first_name.split(',').map(|s| s.trim().to_owned()).collect();
+            build_hex_color_profile(&colors).expect("hex colors should be valid")
+        } else {
+            flags.iter().find(|(_, _, name)| name == &first_name).map(|(p, _, _)| p.color_profile()).unwrap_or_else(|| Preset::Rainbow.color_profile())
+        }
+    };
+
+    {
+        let colored_names = selected_preset_names.iter().map(|name| {
+            let profile = if name.contains('#') {
+                let colors: Vec<String> = name.split(',').map(|s| s.trim().to_owned()).collect();
+                build_hex_color_profile(&colors).expect("hex colors should be valid")
+            } else {
+                flags.iter().find(|(_, _, n)| n == name).map(|(p, _, _)| p.color_profile()).unwrap_or_else(|| Preset::Rainbow.color_profile())
+            };
+            profile.with_lightness_adaptive(default_lightness, theme)
+                .color_text(name, color_mode, ForegroundBackground::Foreground, false)
+                .expect("coloring text should not fail")
+        }).join(", ");
+
+        let label = if selected_preset_names.len() > 1 {
+            "Selected flags (random)"
+        } else {
+            "Selected flag"
+        };
+
+        update_title(
+            &mut title,
+            &mut option_counter,
+            label,
+            &colored_names,
+        );
+
+        printc(
+            format!(
+                "Which {preset_default_colored} do you want to use? {}\n",
+                colored_names
+            ),
+            color_mode,
+        )
+        .context("failed to print preset selection summary")?;
     }
 
     //////////////////////////////
@@ -736,26 +959,26 @@ fn create_config(
     } else {
         detected_dst.unwrap()
     };
-    
+
     let running_dst_sml = if Distro::detect(&detected_dst_small_fmt).is_some() {
         detected_dst_small_fmt
     } else {
         "".to_string()
     };
 
-    
+
     // load ascii
     let small_asc = get_distro_ascii(Some(&running_dst_sml), backend).context("failed to get distro ascii")?;
     let small_asc = small_asc.to_normalized().context("failed to normalize ascii")?;
-    
+
     let mut asc = asc;
-    let mut logo_chosen: Option<String> = distro.cloned(); 
-    
-    if small_asc.lines != asc.lines && running_dst_sml != "" { 
+    let mut logo_chosen: Option<String> = distro.cloned();
+
+    if small_asc.lines != asc.lines && running_dst_sml != "" {
         let ds_arrangements = [
             ("Default", asc.clone()),
             ("Small", small_asc.clone())
-        ];   
+        ];
 
         let arrangements: IndexMap<Cow<str>, NormalizedAsciiArt> =
             ds_arrangements.map(|(k, a)| (k.into(), a)).into();
@@ -792,15 +1015,15 @@ fn create_config(
 
             // prints small logo w/ big logo
             for row in &asciis.into_iter().chunks(usize::from(ascii_per_row)) {
-                
+
                 let row: Vec<Vec<String>> = row.collect();
-                
+
                 for i in 0..usize::from(asc.h).checked_add(1).unwrap() {
                     let mut line = Vec::new();
                     for lines in &row {
                             line.push(&*lines[i]);
                     }
-                    printc(line.join("                 "), color_mode).context("failed to print ascii line")?; 
+                    printc(line.join("                 "), color_mode).context("failed to print ascii line")?;
                 }
 
                 println!();
@@ -811,7 +1034,7 @@ fn create_config(
             let choice = literal_input("Your choice?", &opts[..], "default", true, color_mode)
                 .context("failed to ask for choice input")
                 .context("failed to select logo type").context("failed to ask for choice input")?;
-            
+
             if choice.to_lowercase() == "small" {
                 logo_chosen = Some(running_dst_sml);
                 asc = small_asc;
@@ -940,7 +1163,7 @@ fn create_config(
         // Save choice
         color_align = if choice == "horizontal" { ColorAlignment::Horizontal }
         else if choice == "vertical" { ColorAlignment::Vertical }
-        else { 
+        else {
             arrangements.into_iter()
                 .find_map(|(k, ca)| {
                     if k.to_lowercase() == choice {
@@ -1057,7 +1280,7 @@ fn create_config(
     // Create config
     clear_screen(Some(&title), color_mode, debug_mode).context("failed to clear screen")?;
     let config = Config {
-        preset: preset.as_ref().to_string(),
+        preset: selected_presets,
         mode: color_mode,
         light_dark: Some(theme),
         auto_detect_light_dark: Some(det_bg.is_some()),
@@ -1068,6 +1291,7 @@ fn create_config(
         distro: logo_chosen,
         pride_month_disable: false,
         custom_ascii_path,
+        custom_presets: None,
     };
     debug!(?config, "created config");
 

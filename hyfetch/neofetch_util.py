@@ -248,19 +248,22 @@ def check_windows_cmd():
     #         sys.exit(0)
 
 
-def run_neofetch_cmd(args: str, pipe: bool = False) -> str | None:
+def run_neofetch_cmd(args: str | list[str], pipe: bool = False) -> str | None:
     """
     Run neofetch command
     """
+    if isinstance(args, str):
+        args = shlex.split(args)
+
     if platform.system() != 'Windows':
         bash = ['/usr/bin/env', 'bash'] if Path('/usr/bin/env').is_file() else [shutil.which('bash')]
-        full_cmd = [*bash, get_command_path(), *shlex.split(args)]
+        full_cmd = [*bash, get_command_path(), *args]
 
     else:
         cmd = get_command_path().replace("\\", "/").replace("C:/", "/c/")
-        args = args.replace('\\', '/').replace('C:/', '/c/')
+        args = [a.replace('\\', '/').replace('C:/', '/c/') for a in args]
 
-        full_cmd = [ensure_git_bash(), cmd, *shlex.split(args)]
+        full_cmd = [ensure_git_bash(), cmd, *args]
 
     full_cmd = [str(c) for c in full_cmd]
     if pipe:
@@ -409,24 +412,12 @@ def get_fore_back(distro: str | None = None) -> tuple[int, int] | None:
         distro = GLOBAL_CFG.override_distro
     if not distro:
         distro = get_distro_name().lower()
-    distro = distro.lower().replace(' ', '-')
-    for k, v in fore_back.items():
-        if distro.startswith(k.lower()):
-            return v
+    
+    det = distro_detector.detect(distro)
+    if det and hasattr(det, 'foreground') and det.foreground:
+        f = det.foreground[0]
+        b = getattr(det, 'background', None)
+        return f, b
+        
     return None
-
-
-# Foreground-background recommendation
-fore_back = {
-    'fedora': (2, 1),
-    'kubuntu': (2, 1),
-    'lubuntu': (2, 1),
-    'xubuntu': (2, 1),
-    'ubuntu-cinnamon': (2, 1),
-    'ubuntu-kylin': (2, 1),
-    'ubuntu-mate': (2, 1),
-    'ubuntu-studio': (2, 1),
-    'ubuntu-sway': (2, 1),
-    'ultramarine': (2, 1),
-}
 

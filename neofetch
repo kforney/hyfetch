@@ -28,7 +28,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version=8.0.5
+version=8.1.0
 
 # Fallback to a value of '5' for shells which support bash
 # but do not set the 'BASH_' shell variables (osh).
@@ -873,34 +873,34 @@ image_source="auto"
 # BigLinux_large, Bitrig, BlackArch, BlackMesa, blackPanther, BLAG, BlankOn, BlueLight, Bodhi,
 # bonsai, BSD, BunsenLabs, CachyOS, Calculate, CalinixOS, Carbs, CBL-Mariner, CelOS, Center, CentOS,
 # Chakra, ChaletOS, Chapeau, Chimera, ChonkySealOS, Chrom, Cleanjaro, Clear Linux OS, ClearOS,
-# Clover, Cobalt, Condres, Container Linux by CoreOS, CRUX, Crystal Linux, Cucumber, CutefishOS,
-# CuteOS, CyberOS, dahlia, DarkOs, Darwin, Debian, Deepin, DesaOS, Devuan, DietPi, digital UNIX,
-# DracOS, DragonFly, Drauger, Droidian, Elementary, Elive, EncryptOS, EndeavourOS, Endless, Enso,
-# EuroLinux, EvolutionOS, eweOS, Exherbo, Exodia Predator OS, Fedora, Fedora Kinoite, Fedora
-# Sericea, Fedora Silverblue, Fedora_unicode, FemboyOS, Feren, Finnix, Floflis, FreeBSD, FreeMiNT,
-# Frugalware, Funtoo, Furreto, GalliumOS, Garuda, Gentoo, GhostBSD, glaucus, Gloire, gNewSense,
-# GNOME, GNU, GoboLinux, GrapheneOS, Grombyang, Guix, Haiku, HamoniKR, HarDClanZ, Hash, Huayra,
-# Hybrid, HydroOS, Hyperbola, iglunix, instantOS, Interix, IRIX, Itc, januslinux, Kaisen, Kali,
-# KaOS, KDE, Kibojoe, Kogaion, Korora, KrassOS, KSLinux, Kubuntu, LainOS, LangitKetujuh, LaxerOS,
-# LEDE, LibreELEC, Linspire, Linux, Linux Lite, Linux Mint, Linux Mint Old, LinuxFromScratch, Live
-# Raizo, LMDE, Lubuntu, Lunar, mac, MacaroniOS, Mageia, Magix, MagpieOS, MainsailOS, Mandriva,
-# Manjaro, MassOS, MatuusOS, Maui, Mauna, Meowix, Mer, Minix, MIRACLE LINUX, MX, Namib, NekOS,
-# Neptune, NetBSD, Netrunner, Nitrux, NixOS, nixos_colorful, Nobara, NomadBSD, Nurunner, NuTyX,
-# Obarun, OBRevenge, OmniOS, Open Source Media Center, OpenBSD, openEuler, OpenIndiana, openKylin,
-# openmamba, OpenMandriva, OpenStage, openSUSE, openSUSE Leap, openSUSE Tumbleweed, openSUSE
-# Tumbleweed-Slowroll, OPNsense, Oracle, orchid, OS Elbrus, PacBSD, Panwah, Parabola, parch, Pardus,
-# Parrot, Parsix, PCBSD, PCLinuxOS, pearOS, Pengwin, Pentoo, Peppermint, Peropesis, phyOS, PikaOS,
-# Pisi, PNM Linux, Pop!_OS, Porteus, PostMarketOS, Profelis SambaBOX, Proxmox, PuffOS, Puppy,
-# PureOS, Q4OS, Qubes, Qubyt, Quibian, Radix, Raspbian, ravynOS, Reborn OS, Red Star, Redcore,
-# Redhat, Refracted Devuan, Regata, Regolith, RhaymOS, Rhino Linux, rocky, Rosa, Sabayon, sabotage,
-# Sailfish, SalentOS, Salient OS, Salix, Sasanqua, Scientific, secureblue, semc, Septor, Serene,
-# SharkLinux, ShastraOS, Siduction, SkiffOS, Slackel, Slackware, SliTaz, SmartOS, Soda, Solus,
-# Source Mage, Sparky, Star, SteamOS, Stock Linux, Sulin, SunOS, SwagArch, t2, Tails, Tatra, TeArch,
-# TorizonCore, Trisquel, Twister, Ubuntu, Ubuntu Budgie, Ubuntu Cinnamon, Ubuntu Kylin, Ubuntu MATE,
-# Ubuntu Studio, Ubuntu Sway, Ubuntu Touch, Ubuntu-GNOME, ubuntu_old02, Ultramarine Linux,
-# unicodearch, Univalent, Univention, Uos, UrukOS, uwuntu, Vanilla, Venom, VNux, Void, VzLinux, wii-
-# linux-ngx, Windows, Windows 10, Windows 11, Windows95, Wrt, Xenia, Xenia2, XFerience, Xray_OS,
-# Xubuntu, yiffOS, Zorin have ascii logos.
+# Clover, Cobalt, Codex Linux, Condres, Container Linux by CoreOS, CRUX, Crystal Linux, Cucumber,
+# CutefishOS, CuteOS, CyberOS, dahlia, DarkOs, Darwin, Debian, Deepin, DesaOS, Devuan, DietPi,
+# digital UNIX, DracOS, DragonFly, Drauger, Droidian, Elementary, Elive, EncryptOS, EndeavourOS,
+# Endless, Enso, EuroLinux, EvolutionOS, eweOS, Exherbo, Exodia Predator OS, Fedora, Fedora Kinoite,
+# Fedora Sericea, Fedora Silverblue, Fedora_unicode, FemboyOS, Feren, Finnix, Floflis, FreeBSD,
+# FreeMiNT, Frugalware, Funtoo, Furreto, GalliumOS, Garuda, Gentoo, GhostBSD, glaucus, Gloire,
+# gNewSense, GNOME, GNU, GoboLinux, GrapheneOS, Grombyang, Guix, Haiku, HamoniKR, HarDClanZ, Hash,
+# Huayra, Hybrid, HydroOS, Hyperbola, iglunix, instantOS, Interix, IRIX, Itc, januslinux, Kaisen,
+# Kali, KaOS, KDE, Kibojoe, Kogaion, Korora, KrassOS, KSLinux, Kubuntu, LainOS, LangitKetujuh,
+# LaxerOS, LEDE, LibreELEC, Linspire, Linux, Linux Lite, Linux Mint, Linux Mint Old,
+# LinuxFromScratch, Live Raizo, LMDE, Lubuntu, Lunar, mac, MacaroniOS, Mageia, Magix, MagpieOS,
+# MainsailOS, Mandriva, Manjaro, MassOS, MatuusOS, Maui, Mauna, Meowix, Mer, Minix, MIRACLE LINUX,
+# MX, Namib, NekOS, Neptune, NetBSD, Netrunner, Nitrux, NixOS, nixos_colorful, Nobara, NomadBSD,
+# Nurunner, NuTyX, Obarun, OBRevenge, OmniOS, Open Source Media Center, OpenBSD, openEuler,
+# OpenIndiana, openKylin, openmamba, OpenMandriva, OpenStage, openSUSE, openSUSE Leap, openSUSE
+# Tumbleweed, openSUSE Tumbleweed-Slowroll, OPNsense, Oracle, orchid, OS Elbrus, PacBSD, Panwah,
+# Parabola, parch, Pardus, Parrot, Parsix, PCBSD, PCLinuxOS, pearOS, Pengwin, Pentoo, Peppermint,
+# Peropesis, phyOS, PikaOS, Pisi, PNM Linux, Pop!_OS, Porteus, PostMarketOS, Profelis SambaBOX,
+# Proxmox, PuffOS, Puppy, PureOS, Q4OS, QNX, Qubes, Qubyt, Quibian, Radix, Raspbian, ravynOS, Reborn
+# OS, Red Star, Redcore, Redhat, Refracted Devuan, Regata, Regolith, RhaymOS, Rhino Linux, rocky,
+# Rosa, Sabayon, sabotage, Sailfish, SalentOS, Salient OS, Salix, Sasanqua, Scientific, secureblue,
+# semc, Septor, Serene, SharkLinux, ShastraOS, Siduction, SkiffOS, Slackel, Slackware, SliTaz,
+# SmartOS, Soda, Solus, Source Mage, Sparky, Star, SteamOS, Stock Linux, Sulin, SunOS, SwagArch, t2,
+# Tails, Tatra, TeArch, TorizonCore, Trisquel, Twister, Ubuntu, Ubuntu Budgie, Ubuntu Cinnamon,
+# Ubuntu Kylin, Ubuntu MATE, Ubuntu Studio, Ubuntu Sway, Ubuntu Touch, Ubuntu-GNOME, ubuntu_old02,
+# Ultramarine Linux, unicodearch, Univalent, Univention, Uos, UrukOS, uwuntu, Vanilla, Venom, VNux,
+# Void, VzLinux, wii-linux-ngx, Windows, Windows 10, Windows 11, Windows95, Wrt, Xenia, Xenia2,
+# XFerience, Xray_OS, Xubuntu, yiffOS, Zirconium, Zorin have ascii logos.
 
 # NOTE: arch, dragonfly, Fedora, LangitKetujuh, nixos, redhat, Ubuntu, void have 'old' logo
 # variants, use {distro}_old to use them.
@@ -1046,6 +1046,7 @@ get_os() {
         Interix)  os=Interix ;;
         Ironclad) os=Ironclad;;
         OSF1)     os=digitalUNIX ;;
+        QNX)      os=QNX ;;
 
         Linux|GNU*)
             os=Linux
@@ -1523,6 +1524,11 @@ get_distro() {
         digitalUNIX)
             distro="digital UNIX ${kernel_version}"
         ;;
+
+        QNX)
+            distro=$(awk -F'::' '$1 == "device_os" { print $2 }' /pps/services/deviceproperties)
+            distro="${distro} ($(cat /base/etc/os.version))"
+        ;;
     esac
 
     distro=${distro//Enterprise Server}
@@ -1531,7 +1537,7 @@ get_distro() {
 
     # Get OS architecture.
     case $os in
-        Solaris|illumos|AIX|Haiku|IRIX|FreeMiNT|BSD|digitalUNIX)
+        Solaris|illumos|AIX|Haiku|IRIX|FreeMiNT|BSD|digitalUNIX|QNX)
             machine_arch=$(uname -p)
         ;;
 
@@ -1868,6 +1874,10 @@ get_model() {
             model="${model/Manufacturer}"
             model="${model/Model}"
         ;;
+
+        QNX)
+            model=$(awk -F'::' '/modelname/ {m=$2} /modelnumber/ {n=$2} END {print m" ("n")"}' /pps/services/deviceproperties)
+        ;;
     esac
 
     # Remove dummy OEM info.
@@ -2021,6 +2031,13 @@ get_uptime() {
 
         Haiku)
             s=$(($(system_time) / 1000000))
+        ;;
+
+        QNX)
+            boot=$(date -d "$(pidin info | sed -n 's/.*BootTime:\([^$]*\)/\1/p')" +%s)
+            now=$(date +%s)
+
+            s=$((now - boot))
         ;;
     esac
 
@@ -2401,6 +2418,11 @@ get_packages() {
         IRIX)
             manager=swpkg
             pkgs_h=3 tot versions -b && ((packages-=3))
+        ;;
+
+        QNX)
+            has qpkg && pkgs_h=4 tot qpkg list && ((packages-=4))
+            has apk  && tot apk info
         ;;
     esac
 
@@ -3358,6 +3380,17 @@ END
             cores="$(/dev/fs/C/Windows/System32/wbem/WMIC.exe cpu get NumberOfCores)"
             cores="${cores/NumberOfCores}"
         ;;
+
+        "QNX")
+             # Get CPU name
+             cpu="$(uname -m | cut -d '_' -f 1)"
+
+             # Get CPU speed
+             speed="$(pidin info | grep -o '[0-9]\+MHz' | head -1 | tr -d 'MHz')"
+
+             # Get CPU cores
+             cores="$(pidin info | grep -c '^Processor[0-9]')"
+         ;;
     esac
 
     # Remove un-needed patterns from cpu output.
@@ -3779,6 +3812,14 @@ get_memory() {
             mem_free="$(( $(showmem -f) * 1000 ))"
             mem_used="$(( $(showmem -u) * 1000 ))"
             mem_total="$(( $(showmem -t) * 1000 ))"
+        ;;
+
+        "QNX")
+            mem_free="$(( $(pidin info | sed -n 's/.*FreeMem:\([0-9][0-9]*\)MB\/.*/\1/p') * 1024 ))"
+            mem_total="$(( $(pidin info | sed -n 's|.*MB/||;s|MB Boot.*||p') * 1024 ))"
+            mem_used="$((mem_total - mem_free))"
+        ;;
+
     esac
 
     [[ "$memory_percent" == "on" ]] && ((mem_perc=mem_used * 100 / mem_total))
@@ -4209,6 +4250,10 @@ get_resolution() {
 
         "FreeMiNT")
             # Need to block X11 queries
+        ;;
+
+        "QNX")
+            resolution=$(awk -F'::' '$1 == "screen_res" { print $2 }' /pps/services/deviceproperties)
         ;;
 
         *)
@@ -4783,8 +4828,8 @@ END
             term_font="from kitty.cli import *; o = create_default_opts(); \
                        print(f'{o.font_family} {o.font_size}')"
             term_font="$(kitty +runpy ''"$term_font"'')"
-            term_font="${term_font//=}"
-            term_font="${term_font//\'}"
+            term_font="${term_font#family=}"
+            term_font="$(trim_quotes "${term_font}")"
         ;;
 
         "konsole" | "yakuake")
@@ -5244,6 +5289,12 @@ get_battery() {
             battery0full="$(awk -F '[^0-9]*' 'NR==2 {print $4}' /dev/power/acpi_battery/0)"
             battery0now="$(awk -F '[^0-9]*' 'NR==5 {print $4}' /dev/power/acpi_battery/0)"
             battery="$((battery0full * 100 / battery0now))%"
+        ;;
+
+        "QNX")
+            battery="$(sed -n 's/.*"StateOfCharge":\([0-9]*\).*/\1/p' /pps/system/BattMgr/status)%"
+            state="$(sed -n 's/.*"ChargerStatus":"\([^"]*\)".*/\1/p' /pps/system/BattMgr/status )"
+            [[ "$state" == "CHARGING" ]] && battery_state="charging"
         ;;
     esac
 
@@ -6648,13 +6699,13 @@ ASCII:
                                 BlankOn, BlueLight, Bodhi, bonsai, BSD, BunsenLabs, CachyOS,
                                 Calculate, CalinixOS, Carbs, CBL-Mariner, CelOS, Center, CentOS,
                                 Chakra, ChaletOS, Chapeau, Chimera, ChonkySealOS, Chrom, Cleanjaro,
-                                Clear Linux OS, ClearOS, Clover, Cobalt, Condres, Container Linux by
-                                CoreOS, CRUX, Crystal Linux, Cucumber, CutefishOS, CuteOS, CyberOS,
-                                dahlia, DarkOs, Darwin, Debian, Deepin, DesaOS, Devuan, DietPi,
-                                digital UNIX, DracOS, DragonFly, Drauger, Droidian, Elementary,
-                                Elive, EncryptOS, EndeavourOS, Endless, Enso, EuroLinux,
-                                EvolutionOS, eweOS, Exherbo, Exodia Predator OS, Fedora, Fedora
-                                Kinoite, Fedora Sericea, Fedora Silverblue, Fedora_unicode,
+                                Clear Linux OS, ClearOS, Clover, Cobalt, Codex Linux, Condres,
+                                Container Linux by CoreOS, CRUX, Crystal Linux, Cucumber,
+                                CutefishOS, CuteOS, CyberOS, dahlia, DarkOs, Darwin, Debian, Deepin,
+                                DesaOS, Devuan, DietPi, digital UNIX, DracOS, DragonFly, Drauger,
+                                Droidian, Elementary, Elive, EncryptOS, EndeavourOS, Endless, Enso,
+                                EuroLinux, EvolutionOS, eweOS, Exherbo, Exodia Predator OS, Fedora,
+                                Fedora Kinoite, Fedora Sericea, Fedora Silverblue, Fedora_unicode,
                                 FemboyOS, Feren, Finnix, Floflis, FreeBSD, FreeMiNT, Frugalware,
                                 Funtoo, Furreto, GalliumOS, Garuda, Gentoo, GhostBSD, glaucus,
                                 Gloire, gNewSense, GNOME, GNU, GoboLinux, GrapheneOS, Grombyang,
@@ -6674,7 +6725,7 @@ ASCII:
                                 OS Elbrus, PacBSD, Panwah, Parabola, parch, Pardus, Parrot, Parsix,
                                 PCBSD, PCLinuxOS, pearOS, Pengwin, Pentoo, Peppermint, Peropesis,
                                 phyOS, PikaOS, Pisi, PNM Linux, Pop!_OS, Porteus, PostMarketOS,
-                                Profelis SambaBOX, Proxmox, PuffOS, Puppy, PureOS, Q4OS, Qubes,
+                                Profelis SambaBOX, Proxmox, PuffOS, Puppy, PureOS, Q4OS, QNX, Qubes,
                                 Qubyt, Quibian, Radix, Raspbian, ravynOS, Reborn OS, Red Star,
                                 Redcore, Redhat, Refracted Devuan, Regata, Regolith, RhaymOS, Rhino
                                 Linux, rocky, Rosa, Sabayon, sabotage, Sailfish, SalentOS, Salient
@@ -6688,7 +6739,7 @@ ASCII:
                                 unicodearch, Univalent, Univention, Uos, UrukOS, uwuntu, Vanilla,
                                 Venom, VNux, Void, VzLinux, wii-linux-ngx, Windows, Windows 10,
                                 Windows 11, Windows95, Wrt, Xenia, Xenia2, XFerience, Xray_OS,
-                                Xubuntu, yiffOS, Zorin have ascii logos.
+                                Xubuntu, yiffOS, Zirconium, Zorin have ascii logos.
 
                                 NOTE: arch, dragonfly, Fedora, LangitKetujuh, nixos, redhat, Ubuntu,
                                 void have 'old' logo variants, use {distro}_old to use them.
@@ -9139,6 +9190,24 @@ oNMMMMMMMMMMMNs`  `sy`  `oNMMMMMMMMMMMNo
            `oNMMMMMMMMMMMMNo`
              `oNMMMNNMMMNs`
                `omo``oNs`
+EOF
+        ;;
+
+        "Codex Linux"*)
+            set_colors fg
+            read -rd '' ascii_data <<'EOF'
+${c1}#:              :+#@@@@%#
+@@#:          .*@@@@@@@@@
+@@@@#-       .@@@@@@@@@@@
+@@@@@@%-     %@@@@@@@@@@@
+@@@@@@@@%=  :@@@@%%%%@@@@
+@@@@@@@@@@%==*-:     .:=#
+:*@@@@@@@@@@=
+  :*@@@@@@@@=
+    .*@@@@@@=
+      .+@@@@=
+        .+%@=
+           +=
 EOF
         ;;
 
@@ -13376,6 +13445,26 @@ ${c1}:##############.      ${c2}:======:
       ${c1}:###########         ${c2}.=====:
         ${c1}.#########           ${c2}.=:
             ${c1}.#####
+EOF
+        ;;
+
+        "QNX"* | "Blackberry 10"*)
+            set_colors 1
+            read -rd '' ascii_data <<'EOF'
+${c1}    .KMMMMMbo     .KMMMMMbo
+    aMMMMMMMMb    aMMMMMMMMb
+   ,KMMMMMMMMp   ,KMMMMMMMMp
+   AMMMMMMMP*    AMMMMMMMP*   ,KMMMMMbo
+                              aMMMMMMMMb
+ .KMMMMMbo     .KMMMMMbo     .KMMMMMMMMp
+ aMMMMMMMMb    aMMMMMMMMb    AMMMMMMMP*
+,KMMMMMMMMp   .KMMMMMMMMp
+AMMMMMMMP*    AMMMMMMMP*    .KMMMMMbo
+                            aMMMMMMMMb
+            .KMMMMMbo      ,KMMMMMMMMp
+            aMMMMMMMMb     AMMMMMMMP*
+           ,KMMMMMMMMp
+           AMMMMMMMP*
 EOF
         ;;
 
